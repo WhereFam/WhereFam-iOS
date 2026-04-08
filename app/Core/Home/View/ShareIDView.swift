@@ -1,44 +1,45 @@
 // app/Core/Home/View/ShareIDView.swift
+// Shows your permanent public key QR — for manual sharing
+// The invite-based pairing QR is in PeopleView > AddPersonSheet
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 
 struct ShareIDView: View {
     @EnvironmentObject var rpc: RPCViewModel
     @State private var qrImage: UIImage?
+    @State private var copied  = false
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 Spacer()
-                
-                Group {
-                    if let qr = qrImage {
-                        Image(uiImage: qr)
-                            .interpolation(.none)
-                            .resizable().scaledToFit()
-                            .frame(width: 200, height: 200)
-                            .padding(16)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                    } else {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemFill))
-                            .frame(width: 200, height: 200)
-                            .overlay(
-                                rpc.publicKey.isEmpty
-                                ? AnyView(ProgressView())
-                                : AnyView(EmptyView())
-                            )
-                    }
+
+                if let qr = qrImage {
+                    Image(uiImage: qr)
+                        .interpolation(.none)
+                        .resizable().scaledToFit()
+                        .frame(width: 200, height: 200)
+                        .padding(16)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.1), radius: 8)
+                } else {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(.systemFill))
+                        .frame(width: 200, height: 200)
+                        .overlay(ProgressView())
                 }
-                
-                HStack {
-                    Rectangle().fill(Color(.separator)).frame(height: 0.5)
-                    Text("or copy ID").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 8)
-                    Rectangle().fill(Color(.separator)).frame(height: 0.5)
-                }.padding(.horizontal, 32)
-                
+
+                VStack(spacing: 6) {
+                    Text("Your permanent WhereFam ID")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text("For one-tap adding, use the invite QR in People → +")
+                        .font(.caption).foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center).padding(.horizontal)
+                }
+
+                // Key display
                 if !rpc.publicKey.isEmpty {
                     HStack(spacing: 8) {
                         Text(rpc.publicKey)
@@ -47,23 +48,22 @@ struct ShareIDView: View {
                             .padding(10)
                             .background(Color(.secondarySystemFill))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+
                         Button {
                             UIPasteboard.general.string = rpc.publicKey
+                            copied = true
+                            Task { try? await Task.sleep(for: .seconds(2)); copied = false }
                         } label: {
-                            Image(systemName: "doc.on.clipboard")
+                            Image(systemName: copied ? "checkmark" : "doc.on.clipboard")
                                 .foregroundStyle(.blue)
                                 .padding(10)
                                 .background(Color(.secondarySystemFill))
                                 .clipShape(Circle())
                         }
-                        .accessibilityLabel("Copy ID")
                     }
                     .padding(.horizontal, 24)
-                } else {
-                    Text("Connecting…")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
-                
+
                 Spacer()
             }
             .navigationTitle("Your ID")
@@ -85,24 +85,16 @@ struct ShareIDView: View {
             .presentationDragIndicator(.visible)
         }
         .onAppear {
-            // If we already have the key just generate the QR
-            if !rpc.publicKey.isEmpty {
-                generateQR()
-            } else {
-                // Request it from the JS side — response comes via publicKeyResponse
-                Task { await rpc.send(.requestPublicKey) }
-            }
+            if !rpc.publicKey.isEmpty { generateQR() }
+            else { Task { await rpc.send(.requestPublicKey) } }
         }
         .onChange(of: rpc.publicKey) { _, _ in generateQR() }
     }
-    
+
     private func generateQR() {
         guard !rpc.publicKey.isEmpty else { return }
-        let b64url = rpc.publicKey
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
-        guard let data = "wherefam://add?id=\(b64url)".data(using: .utf8) else { return }
+        // Encode as wherefam://add?id=<key> — permanent ID deep link
+        guard let data = "wherefam://add?id=\(rpc.publicKey)".data(using: .utf8) else { return }
         let filter = CIFilter.qrCodeGenerator()
         filter.setValue(data, forKey: "inputMessage")
         filter.setValue("M",  forKey: "inputCorrectionLevel")

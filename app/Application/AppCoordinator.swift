@@ -43,6 +43,12 @@ final class AppCoordinator: ObservableObject {
         await syncProfile(rpc: rpc)
 
         state = .ready
+
+        // Handle deep link invite that arrived during cold launch
+        if let invite = AppEnvironment.shared.pendingInvite {
+            AppEnvironment.shared.pendingInvite = nil
+            await rpc.send(.joinWithInvite, data: ["invite": invite])
+        }
     }
 
     private func waitForReady(rpc: RPCViewModel) async -> Bool {
@@ -57,8 +63,6 @@ final class AppCoordinator: ObservableObject {
         Task { [weak self] in
             guard self != nil else { return }
             for await location in LocationManager.shared.locationUpdates() {
-                print("[Coordinator] location tick, ready:\(rpc.isReady) pk:\(rpc.publicKey.prefix(8))")
-
                 guard rpc.isReady, !rpc.publicKey.isEmpty else { continue }
                 var payload: [String: Any] = [
                     "id":              rpc.publicKey,
@@ -75,7 +79,6 @@ final class AppCoordinator: ObservableObject {
                     payload["avatarData"] = b64
                 }
                 await rpc.send(.locationUpdate, data: payload)
-                print("[Coordinator] location sent")
             }
         }
     }

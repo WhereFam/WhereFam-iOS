@@ -33,7 +33,7 @@ struct WhereFamApp: SwiftUI.App {
                 .environmentObject(safety)
                 .environmentObject(battery)
                 .onAppear(perform: boot)
-                .onOpenURL { DeepLinkHandler.shared.handle($0, rpc: rpc) }
+                .onOpenURL { DeepLinkHandler.shared.handle($0) }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
