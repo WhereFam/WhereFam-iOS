@@ -1,68 +1,113 @@
-//
-//  LocationManager.swift
-//  App
-//
-//  Created by joker on 2025-01-13.
-//
-
+// app/Manager/LocationManager.swift
 import CoreLocation
 
-class LocationManager: NSObject, ObservableObject {
-    private let manager = CLLocationManager()
-    @Published var userLocation: CLLocation?
-    
+@MainActor
+final class LocationManager: NSObject, ObservableObject {
     static let shared = LocationManager()
-    
-    override init() {
+    @Published var userLocation: CLLocation?
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published var currentPlaceName: String?
+
+    weak var rpc: RPCViewModel?
+
+    private let manager  = CLLocationManager()
+    private let geocoder = CLGeocoder()
+    private var lastBroadcast: CLLocation?
+    private var lastGeocode: CLLocation?
+    private var continuations: [UUID: AsyncStream<CLLocation>.Continuation] = [:]
+
+    private override init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.startUpdatingLocation()
-        manager.allowsBackgroundLocationUpdates = true
+        manager.distanceFilter  = kCLDistanceFilterNone  // accept all updates in simulator
+        manager.activityType    = .other
+        manager.pausesLocationUpdatesAutomatically = false
     }
-    
-    func requestLocation() {
-        manager.requestWhenInUseAuthorization()
-        manager.requestAlwaysAuthorization()
+
+    func requestPermission() {
+        print("[Location] requesting permission, status: \(manager.authorizationStatus.rawValue)")
+        switch manager.authorizationStatus {
+        case .notDetermined:        manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse:  startUpdating(); manager.requestAlwaysAuthorization()
+        case .authorizedAlways:     startFull()
+        default:
+            print("[Location] permission denied or restricted")
+        }
     }
-    
+
     func locationUpdates() -> AsyncStream<CLLocation> {
+        let id = UUID()
         return AsyncStream { continuation in
-            let updates = CLLocationUpdate.liveUpdates()
-            Task {
-                do {
-                    for try await update in updates {
-                        if let location = update.location {
-                            continuation.yield(location)
-                        }
-                    }
-                } catch {
-                    continuation.finish()
+            Task { @MainActor [weak self] in
+                self?.continuations[id] = continuation
+            }
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.continuations.removeValue(forKey: id)
                 }
             }
+        }
+    }
+
+    private func startUpdating() {
+        print("[Location] startUpdatingLocation")
+        manager.startUpdatingLocation()
+    }
+
+    private func startFull() {
+        print("[Location] startFull — background + significant changes")
+        manager.allowsBackgroundLocationUpdates = true
+        manager.startMonitoringSignificantLocationChanges()
+        manager.startUpdatingLocation()
+    }
+
+    private func broadcast(_ location: CLLocation) {
+        print("[Location] broadcast acc:\(Int(location.horizontalAccuracy)) dist:\(Int(lastBroadcast.map { location.distance(from: $0) } ?? 999))m")
+        // Relaxed accuracy for simulator (simulator often returns -1 or large values)
+        guard location.horizontalAccuracy < 500 else {
+            print("[Location] rejected — poor accuracy: \(location.horizontalAccuracy)")
+            return
+        }
+        lastBroadcast = location
+        userLocation  = location
+        continuations.values.forEach { $0.yield(location) }
+        maybeGeocode(location)
+    }
+
+    private func maybeGeocode(_ loc: CLLocation) {
+        if let last = lastGeocode, loc.distance(from: last) < 100 { return }
+        lastGeocode = loc
+        geocoder.reverseGeocodeLocation(loc) { [weak self] marks, _ in
+            let label = [marks?.first?.name, marks?.first?.locality]
+                .compactMap { $0 }.joined(separator: ", ")
+            Task { @MainActor [weak self] in self?.currentPlaceName = label.isEmpty ? nil : label }
         }
     }
 }
 
 extension LocationManager: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        switch status {
-            
-        case .notDetermined:
-            print("DEBUG: Not determined")
-        case .restricted:
-            print("DEBUG: Restricted")
-        case .denied:
-            print("DEBUG: Denied")
-        case .authorizedAlways, .authorizedWhenInUse:
-            print("DEBUG: Auth always and in use")
-        @unknown default:
-            break
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            print("[Location] auth changed: \(manager.authorizationStatus.rawValue)")
+            self.authorizationStatus = manager.authorizationStatus
+            switch manager.authorizationStatus {
+            case .authorizedAlways:    self.startFull()
+            case .authorizedWhenInUse: self.startUpdating(); manager.requestAlwaysAuthorization()
+            case .denied, .restricted: manager.stopUpdatingLocation()
+            default: break
+            }
         }
     }
-    
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        self.userLocation = location
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let loc = locations.last else { return }
+        print("[Location] didUpdateLocations: \(loc.coordinate.latitude),\(loc.coordinate.longitude) acc:\(loc.horizontalAccuracy)")
+        Task { @MainActor in self.broadcast(loc) }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if (error as? CLError)?.code == .locationUnknown { return }
+        print("[Location] error: \(error.localizedDescription)")
     }
 }
