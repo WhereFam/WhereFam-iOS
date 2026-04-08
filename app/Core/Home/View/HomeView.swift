@@ -52,7 +52,7 @@ struct MapMenuFAB: View {
     @State private var selected: MenuOpt?
 
     enum MenuOpt: String, Identifiable {
-        case shareID, support, identity, about
+        case shareID, support, about
         var id: String { rawValue }
     }
 
@@ -60,7 +60,6 @@ struct MapMenuFAB: View {
         Menu {
             Button { selected = .shareID }  label: { Label("Share Your ID",  systemImage: "qrcode") }
             Button { selected = .support }  label: { Label("Support App",    systemImage: "wand.and.stars") }
-            Button { selected = .identity } label: { Label("Your Identity",  systemImage: "key.fill") }
             ShareLink(item: URL(string: "https://wherefam.com")!) { Label("Refer a Friend", systemImage: "square.and.arrow.up") }
             if let url = URL(string: "https://apps.apple.com/app/id6749550634?action=write-review") {
                 Link(destination: url) { Label("Rate App", systemImage: "star") }
@@ -75,7 +74,6 @@ struct MapMenuFAB: View {
             switch opt {
             case .shareID:  ShareIDView()
             case .support:  StoreKitPaywallView()
-            case .identity: IdentityView()
             case .about:    AboutView()
             }
         }
