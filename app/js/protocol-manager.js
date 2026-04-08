@@ -44,7 +44,6 @@ function setupProtocol () {
 
     channels.set(peerHex, { locationMsg, placeMsg, sosMsg, batteryMsg })
     channel.open()
-    console.log('[protocol] channel opened for:', peerHex.slice(0, 12))
   })
 }
 
@@ -67,7 +66,6 @@ async function sendLocation (data) {
   }
 
   const count = channels.size
-  console.log('[protocol] broadcasting location to', count, 'peers')
   broadcast('locationMsg', entry)
 }
 

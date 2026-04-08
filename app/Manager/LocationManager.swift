@@ -51,19 +51,16 @@ final class LocationManager: NSObject, ObservableObject {
     }
 
     private func startUpdating() {
-        print("[Location] startUpdatingLocation")
         manager.startUpdatingLocation()
     }
 
     private func startFull() {
-        print("[Location] startFull — background + significant changes")
         manager.allowsBackgroundLocationUpdates = true
         manager.startMonitoringSignificantLocationChanges()
         manager.startUpdatingLocation()
     }
 
     private func broadcast(_ location: CLLocation) {
-        print("[Location] broadcast acc:\(Int(location.horizontalAccuracy)) dist:\(Int(lastBroadcast.map { location.distance(from: $0) } ?? 999))m")
         // Relaxed accuracy for simulator (simulator often returns -1 or large values)
         guard location.horizontalAccuracy < 500 else {
             print("[Location] rejected — poor accuracy: \(location.horizontalAccuracy)")
@@ -89,7 +86,6 @@ final class LocationManager: NSObject, ObservableObject {
 extension LocationManager: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            print("[Location] auth changed: \(manager.authorizationStatus.rawValue)")
             self.authorizationStatus = manager.authorizationStatus
             switch manager.authorizationStatus {
             case .authorizedAlways:    self.startFull()
@@ -102,7 +98,6 @@ extension LocationManager: CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
-        print("[Location] didUpdateLocations: \(loc.coordinate.latitude),\(loc.coordinate.longitude) acc:\(loc.horizontalAccuracy)")
         Task { @MainActor in self.broadcast(loc) }
     }
 
