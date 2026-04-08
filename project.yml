@@ -59,9 +59,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - wherefam
-            CFBundleURLName: com.wherefam.ios
-            CFBundleDisplayName: "WhereFam"
-            CFBundleShortVersionString: "1.0.0"
+        CFBundleURLName: com.wherefam.ios
+        CFBundleDisplayName: "WhereFam"
+        CFBundleShortVersionString: "2.0.0"
 
     entitlements:
       path: app/WhereFam.entitlements
@@ -78,7 +78,7 @@ targets:
             - fetch
             - processing
 
-    appIcon: app/Assets.xcassets/AppIcon.appiconset
+    appIcon: app/WhereFam.icon
 
     dependencies:
       - package: ConcentricOnboarding
@@ -112,7 +112,6 @@ targets:
       - path: app/Core/Home/View/SafetyView.swift
       - path: app/Core/Home/View/ShareIDView.swift
       - path: app/Core/Home/View/SimpleMapView.swift
-      - path: app/Core/Home/View/IdentityView.swift
       - path: app/Core/Home/View/StoreKitPaywallView.swift
       - path: app/Core/Home/View/AboutView.swift
 
