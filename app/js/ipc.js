@@ -1,45 +1,36 @@
-//
-//  ipc.js
-//  WhereFam
-//
-//  Created by joker on 2025-08-02.
-//
+// app/js/ipc.js
+// WhereFam — raw IPC transport between Swift and Bare
 
 const { IPC } = BareKit
 const EventEmitter = require('bare-events')
 
 const emitter = new EventEmitter()
-let ipcBuffer = ''
+let buffer = ''
 
 IPC.setEncoding('utf8')
 
-IPC.on('data', async (chunck) => {
-  ipcBuffer += chunck
-
-  let newLineIndex
-  while ((newLineIndex = ipcBuffer.indexOf('\n')) !== -1) {
-    const line = ipcBuffer.substring(0, newLineIndex).trim()
-    ipcBuffer = ipcBuffer.substring(newLineIndex + 1)
-
-    if (line.length === 0) {
-      continue
-    }
-
+IPC.on('data', (chunk) => {
+  buffer += chunk
+  let idx
+  while ((idx = buffer.indexOf('\n')) !== -1) {
+    const line = buffer.slice(0, idx).trim()
+    buffer = buffer.slice(idx + 1)
+    if (!line) continue
     try {
-      const message = JSON.parse(line)
-      emitter.emit(message.action, message.data)
-    } catch (error) {
-      console.error('Error handling IPC message: ', error)
+      const msg = JSON.parse(line)
+      if (msg?.action) emitter.emit(msg.action, msg.data)
+    } catch (e) {
+      console.error('[ipc] parse error:', e.message)
     }
   }
 })
 
-function sendIPCMessage(action, data) {
-  const message = { action, data }
-  IPC.write(JSON.stringify(message) + '\n')
+function send (action, data) {
+  IPC.write(JSON.stringify({ action, data }) + '\n')
 }
 
 module.exports = {
-  on: emitter.on.bind(emitter),
-  send: sendIPCMessage
+  on:  (action, fn) => emitter.on(action, fn),
+  off: (action, fn) => emitter.off(action, fn),
+  send
 }

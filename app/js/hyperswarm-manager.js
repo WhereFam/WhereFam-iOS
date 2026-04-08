@@ -1,137 +1,105 @@
-// src/hyperswarm-manager.js
-const Hyperswarm = require('hyperswarm')
-const b4a = require('b4a')
-const Protomux = require('protomux')
-const hyperbeeManager = require('./hyperbee-manager.js')
-const ipc = require('./ipc')
+// app/js/hyperswarm-manager.js
+const Hyperswarm      = require('hyperswarm')
+const Protomux        = require('protomux')
+const crypto          = require('hypercore-crypto')
+const b4a             = require('b4a')
+const ipc             = require('./ipc')
+const hyperbeeManager = require('./hyperbee-manager')
+const feedManager     = require('./feed-manager')
 
-let swarm = null
-const protocolHandlers = new Map()
-let connections = []
-let tempLeaveCache = new Set()
+let swarm    = null
+let _ownKey  = null  // our public key hex
 
-async function initializeHyperswarm(keyPair) {
-    if (swarm) {
-        console.warn('Hyperswarm already initialized.')
-        return swarm
+const connections      = new Map()  // hex → { mux, conn }
+const protocolHandlers = new Map()  // name → handler fn
+const leaveSet         = new Set()  // explicitly-left peers (hex)
+const joinedTopics     = new Map()  // peerHex → discovery instance
+
+async function initializeHyperswarm (keyPair) {
+  if (swarm) return swarm
+
+  _ownKey = b4a.toString(keyPair.publicKey, 'hex')
+
+  swarm = new Hyperswarm({
+    keyPair,
+    firewall (remotePublicKey) {
+      return leaveSet.has(b4a.toString(remotePublicKey, 'hex'))
     }
-    try {
-        swarm = new Hyperswarm({
-            keyPair: keyPair
-            // firewall: async (remotePublicKey) => {
-            //     const remoteKeyBase64 = b4a.toString(remotePublicKey, 'base64')
-            //     const knownPeers = await hyperbeeManager.getKnownPeers()
-            //     const isKnown = knownPeers.has(remoteKeyBase64)
-            //
-            //     if (!isKnown) {
-            //         console.log(`Rejecting connection from unknown peer: ${remoteKeyBase64}`);
-            //     }
-            //
-            //     // Return false to allow the connection, true to reject it
-            //     return !isKnown;
-            // }
-        })
+  })
 
-        swarm.listen()
-        swarm.on('connection', handleConnection)
-        return swarm
-    } catch (error) {
-        console.error('Error initializing Hyperswarm:', error)
-        throw error
-    }
+  swarm.on('connection', handleConnection)
+  console.log('[hyperswarm] ready')
+  return swarm
 }
 
-function handleConnection(conn, info) {
-    const peerPublicKey = b4a.toString(info.publicKey, 'base64')
-    
-    if(tempLeaveCache.has(peerPublicKey)) {
-        conn.destroy()
-        return
-    }
-
-    // Use protomux to multiplex on this connection
-    const mux = new Protomux(conn)
-    connections.push({ mux, publicKey: peerPublicKey })
-
-    // Call all registered protocol handlers for this new connection
-    for (const handler of protocolHandlers.values()) {
-        handler(mux, peerPublicKey)
-    }
-
-    conn.on('close', async () => {
-        connections = connections.filter((m) => m !== mux)
-        ipc.send('peerDisconnected', { peerKey: peerPublicKey })
-        closeConnection(peerPublicKey)
-        tempLeaveCache.add(peerPublicKey)
-    })
-
-    conn.on('error', (e) =>
-        console.log(`Connection error with peer ${peerPublicKey}: ${e}`)
-    )
+// Derive a shared topic from two peer keys — same result on both sides
+// since we sort before hashing
+function peerTopic (ownHex, peerHex) {
+  const keys = [ownHex, peerHex].sort()
+  return crypto.hash(b4a.from(keys[0] + keys[1]))
 }
 
-async function closeConnection(peerPublicKey) {
-    const connectionIndex = connections.findIndex(
-        (c) => c.publicKey === peerPublicKey
-    )
-    if (connectionIndex !== -1) {
-        const connection = connections[connectionIndex]
-        connection.mux.stream.destroy()
-    } else {
-        console.log(`No active connection found for peer: ${peerPublicKey}`)
-    }
+function handleConnection (conn, info) {
+  const key    = b4a.toString(info.publicKey, 'hex')
+  const keyBuf = info.publicKey
+
+  if (leaveSet.has(key)) { conn.destroy(); return }
+
+  console.log('[hyperswarm] connected:', key.slice(0, 12))
+
+  const mux = new Protomux(conn)
+  connections.set(key, { mux, conn })
+
+  feedManager.replicateStore(mux)
+  feedManager.openPeerFeed(keyBuf, key).catch(console.error)
+
+  for (const handler of protocolHandlers.values()) handler(mux, key)
+
+  // Persist every successful connection for reconnection on reboot
+  hyperbeeManager.savePeer(key).catch(console.error)
+
+  conn.on('close', () => {
+    connections.delete(key)
+    feedManager.closePeerFeed(key)
+    ipc.send('peerDisconnected', { peerKey: key })
+    console.log('[hyperswarm] disconnected:', key.slice(0, 12))
+  })
+  conn.on('error', (err) => console.error('[hyperswarm] conn error:', key.slice(0, 12), err.message))
 }
 
-/**
- * Registers a handler for a specific protocol.
- * The handler function will be called for every new connection.
- * @param {string} protocolName
- * @param {function(Protomux, string)} handler
- */
-function registerProtocol(protocolName, handler) {
-    protocolHandlers.set(protocolName, handler)
+async function joinPeer (peerHex) {
+  if (!swarm) { console.error('[hyperswarm] not initialized'); return }
+  if (joinedTopics.has(peerHex)) return  // already joining
+
+  console.log('[hyperswarm] joining peer:', peerHex.slice(0, 12))
+  leaveSet.delete(peerHex)
+  await hyperbeeManager.savePeer(peerHex)
+
+  // Use topic-based join so both sides find each other regardless of who opens first
+  // This keeps announcing on DHT and retries until connected
+  const topic = peerTopic(_ownKey, peerHex)
+  const discovery = swarm.join(topic)
+  joinedTopics.set(peerHex, discovery)
+  await discovery.flushed()
+  console.log('[hyperswarm] announced on topic for:', peerHex.slice(0, 12))
 }
 
-function joinPeer(peerPublicKey) {
-    if (!swarm) {
-        console.error('Hyperswarm not initialized. Cannot join peer.')
-        return
-    }
-    try {
-        tempLeaveCache.delete(peerPublicKey)
-        const publicKeyBuffer = b4a.from(peerPublicKey, 'base64');
-        swarm.joinPeer(publicKeyBuffer)
-    } catch (error) {
-        console.error('Error joining peer:', error)
-    }
+async function leavePeer (peerHex) {
+  if (!swarm) return
+  leaveSet.add(peerHex)
+
+  // Stop announcing on topic
+  const discovery = joinedTopics.get(peerHex)
+  if (discovery) { await discovery.destroy(); joinedTopics.delete(peerHex) }
+
+  const entry = connections.get(peerHex)
+  if (entry) { entry.conn.destroy(); connections.delete(peerHex) }
+
+  feedManager.closePeerFeed(peerHex)
+  await hyperbeeManager.removePeer(peerHex)
 }
 
-function leavePeer(peerPublicKey) {
-    if (!swarm) {
-        console.error('Hyperswarm not initialized. Cannot join peer.')
-        return
-    }
-    try {
-        tempLeaveCache.add(peerPublicKey)
-        swarm.leavePeer(b4a.from(peerPublicKey, 'base64'))
-    } catch (error) {
-        console.error('Error leaving peer:', error)
-    }
-}
+function registerProtocol (name, handler) { protocolHandlers.set(name, handler) }
+function getSwarm () { if (!swarm) throw new Error('[hyperswarm] not initialized'); return swarm }
 
-function getSwarm() {
-    if (!swarm) {
-        throw new Error('Hyperswarm is not initialized yet.')
-    }
-    return swarm
-}
-
-module.exports = {
-    initializeHyperswarm,
-    joinPeer,
-    leavePeer,
-    getSwarm,
-    registerProtocol,
-    connections,
-    closeConnection
-}
+module.exports = { initializeHyperswarm, joinPeer, leavePeer, registerProtocol, getSwarm, connections }

@@ -1,4 +1,7 @@
+// app/js/constants.js
 module.exports = {
-  PMTILES_KEY:
-    '1bfbdb63cf530380fc9ad1a731766d597c3915e32187aeecea36d802bda2c51d'
+  PROTOCOL_VERSION:         'wherefam/v1',
+  MIN_BROADCAST_DISTANCE_M: 10,
+  MAX_ACCURACY_M:           65,
+  LOW_BATTERY_THRESHOLD:    0.20
 }
