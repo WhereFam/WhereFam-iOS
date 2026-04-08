@@ -221,3 +221,9 @@ struct PersonRowView: View {
         }
     }
 }
+
+#Preview {
+    PeopleView()
+        .environmentObject(RPCViewModel())
+        .environmentObject(AppCoordinator())
+}

@@ -319,3 +319,7 @@ struct AddPlaceView: View {
         }
     }
 }
+
+#Preview {
+    PlacesView()
+}

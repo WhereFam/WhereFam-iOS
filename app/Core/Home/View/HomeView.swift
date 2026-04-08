@@ -35,7 +35,7 @@ struct HomeView: View {
     private var mapTab: some View {
         ZStack(alignment: .bottomTrailing) {
             SimpleMapView().ignoresSafeArea()
-            VStack(spacing: 10) {
+            VStack(spacing: 25) {
                 SOSButton()
                 MapMenuFAB()
             }
@@ -112,4 +112,11 @@ struct SOSButton: View {
         case .active:           return .green
         }
     }
+}
+
+#Preview {
+    HomeView()
+        .environmentObject(RPCViewModel())
+        .environmentObject(AppCoordinator())
+        .environmentObject(SafetyManager.shared)
 }

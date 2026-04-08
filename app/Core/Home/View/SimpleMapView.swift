@@ -127,3 +127,8 @@ struct PinSwiftUI: View {
         }
     }
 }
+
+
+#Preview {
+    SimpleMapView()
+}

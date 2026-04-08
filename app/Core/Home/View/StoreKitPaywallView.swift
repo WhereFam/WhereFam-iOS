@@ -80,3 +80,8 @@ struct StoreKitPaywallView: View {
         purchasing = false
     }
 }
+
+#Preview {
+    StoreKitPaywallView()
+        .environmentObject(StoreKitManager.shared)
+}

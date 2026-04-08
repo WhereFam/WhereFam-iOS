@@ -6,12 +6,12 @@ struct ShareIDView: View {
     @EnvironmentObject var rpc: RPCViewModel
     @State private var qrImage: UIImage?
     @Environment(\.dismiss) private var dismiss
-
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 Spacer()
-
+                
                 Group {
                     if let qr = qrImage {
                         Image(uiImage: qr)
@@ -27,18 +27,18 @@ struct ShareIDView: View {
                             .frame(width: 200, height: 200)
                             .overlay(
                                 rpc.publicKey.isEmpty
-                                    ? AnyView(ProgressView())
-                                    : AnyView(EmptyView())
+                                ? AnyView(ProgressView())
+                                : AnyView(EmptyView())
                             )
                     }
                 }
-
+                
                 HStack {
                     Rectangle().fill(Color(.separator)).frame(height: 0.5)
                     Text("or copy ID").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 8)
                     Rectangle().fill(Color(.separator)).frame(height: 0.5)
                 }.padding(.horizontal, 32)
-
+                
                 if !rpc.publicKey.isEmpty {
                     HStack(spacing: 8) {
                         Text(rpc.publicKey)
@@ -63,7 +63,7 @@ struct ShareIDView: View {
                     Text("Connecting…")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-
+                
                 Spacer()
             }
             .navigationTitle("Your ID")
@@ -95,7 +95,7 @@ struct ShareIDView: View {
         }
         .onChange(of: rpc.publicKey) { _, _ in generateQR() }
     }
-
+    
     private func generateQR() {
         guard !rpc.publicKey.isEmpty else { return }
         let b64url = rpc.publicKey
@@ -111,4 +111,9 @@ struct ShareIDView: View {
         guard let cg = CIContext().createCGImage(scaled, from: scaled.extent) else { return }
         qrImage = UIImage(cgImage: cg)
     }
+}
+
+#Preview {
+    ShareIDView()
+        .environmentObject(RPCViewModel())
 }

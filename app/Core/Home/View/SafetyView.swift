@@ -71,3 +71,8 @@ struct SafetyView: View {
         }
     }
 }
+
+#Preview {
+    SafetyView()
+        .environmentObject(SafetyManager.shared)
+}
