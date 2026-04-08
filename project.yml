@@ -11,13 +11,10 @@ packages:
     branch: main
   MapLibreNative:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
-    from: 6.18.0
-  purchases-ios-spm:
-    url: https://github.com/RevenueCat/purchases-ios
-    from: 5.34.0
-  SQLite.swift:
-    url: https://github.com/stephencelis/SQLite.swift
-    from: 0.15.4
+    from: 6.25.0
+  SQLiteData:
+    url: https://github.com/pointfreeco/sqlite-data
+    from: 1.6.1
 
 targets:
   App:
@@ -29,16 +26,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.wherefam.ios
         SWIFT_VERSION: 5.0
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
-        DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
-        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 2VA8UMF2PR
+        CODE_SIGN_STYLE: Manual
+        SIGNING_CERTIFICATE: "Apple Development: Nish Patel (2VA8UMF2PR)"
         OTHER_LDFLAGS: "$(inherited) -weak_framework SwiftUICore"
 
     info:
       path: app/Info.plist
       properties:
-        CFBundleDisplayName: "WhereFam"
-        CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "1"
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -46,149 +41,137 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-
-        NSLocationWhenInUseUsageDescription: We would like to access location for sharing to other members
-        NSLocationAlwaysAndWhenInUseUsageDescription: We would like to access location for sharing to other members
+        NSLocationWhenInUseUsageDescription: "WhereFam shares your location only with people you trust, directly over an encrypted peer-to-peer connection."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "WhereFam needs background location to keep your circle updated even when the app is closed. Your location is never sent to any server."
+        NSLocationAlwaysUsageDescription: "WhereFam needs background location to keep your circle updated even when the app is closed."
         UILaunchStoryboardName: "LaunchScreen.storyboard"
         UIBackgroundModes:
           - location
+          - fetch
+          - processing
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.wherefam.locationburst
         NSLocalNetworkUsageDescription: "We need access to your local network to connect to nearby devices."
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true 
+          NSAllowsArbitraryLoads: true
         UIRequiresFullScreen: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - wherefam
+            CFBundleURLName: com.wherefam.ios
+            CFBundleDisplayName: "WhereFam"
+            CFBundleShortVersionString: "1.0.0"
 
     entitlements:
       path: app/WhereFam.entitlements
       properties:
-        aps-environment: development
-        com.apple.security.application-groups:
-          - group.com.wherefam.ios
         com.apple.security.cs.allow-jit: true
+        # com.apple.developer.background-task-scheduler-permitted-identifiers:
+        #   - com.wherefam.locationburst
 
     capabilities:
       - inAppPurchase: true
-      - pushNotifications: true 
+      - backgroundModes:
+          modes:
+            - location
+            - fetch
+            - processing
 
-    appIcon: app/Assets.xcassets/AppIcon.appIconset
+    appIcon: app/Assets.xcassets/AppIcon.appiconset
+
     dependencies:
       - package: ConcentricOnboarding
       - package: BareKit
       - framework: app/frameworks/BareKit.xcframework
-      - target: NotificationServiceExtension
       - package: MapLibreNative
         product: MapLibre
-      - package: purchases-ios-spm
-        product: RevenueCat
-        product: RevenueCatUI
-      - package: SQLite.swift
-        product: SQLite
+      - package: SQLiteData
+        product: SQLiteData
 
     sources:
-      - path: app/App.swift
-      - path: app/AppDelegate.swift
       - path: app/app.bundle
+        optional: true
       - path: app/Assets.xcassets
       - path: app/NotificationService.swift
-      - path: app/push.bundle
-      - path: app/style.json
-      # - path: app/WhereFam.storekit
       - path: app/LaunchScreen.storyboard
+
+      - path: app/Application/App.swift
+        group: app/Application
+      - path: app/Application/AppDelegate.swift
+      - path: app/Application/AppCoordinator.swift
 
       - path: app/Core/Root/ContentView.swift
         group: app/Core/Root
 
-      - path: app/Core/Home/View/PeopleView.swift
-        group: app/Core/Home/View
       - path: app/Core/Home/View/HomeView.swift
-      - path: app/Core/Home/View/ProvideFeedbackView.swift
+        group: app/Core/Home/View
+      - path: app/Core/Home/View/PeopleView.swift
+      - path: app/Core/Home/View/PersonDetailView.swift
+      - path: app/Core/Home/View/PlacesView.swift
+      - path: app/Core/Home/View/SafetyView.swift
       - path: app/Core/Home/View/ShareIDView.swift
       - path: app/Core/Home/View/SimpleMapView.swift
-      - path: app/Core/Home/View/ThanksView.swift
+      - path: app/Core/Home/View/IdentityView.swift
+      - path: app/Core/Home/View/StoreKitPaywallView.swift
+      - path: app/Core/Home/View/AboutView.swift
 
-      - path: app/Core/Onboarding/View/FifthPageView.swift
-        group: app/Core/Onboarding/View
       - path: app/Core/Onboarding/View/FirstPageView.swift
-      - path: app/Core/Onboarding/View/FourthPageView.swift
+        group: app/Core/Onboarding/View
       - path: app/Core/Onboarding/View/SecondPageView.swift
-      - path: app/Core/Onboarding/View/SixthPageView.swift
       - path: app/Core/Onboarding/View/ThirdPageView.swift
+      - path: app/Core/Onboarding/View/FourthPageView.swift
+      - path: app/Core/Onboarding/View/FifthPageView.swift
+      - path: app/Core/Onboarding/View/SixthPageView.swift
 
-      - path: app/Core/IPC/IPCViewModel.swift
-        group: app/Core/IPC
-      - path: app/Core/IPC/Worker.swift
-
-      - path: app/js/app.js
-        group: app/js
-      - path: app/js/push.js
-      - path: app/js/constants.js
-      - path: app/js/hyperbee-manager.js
-      - path: app/js/hyperswarm-manager.js
-      - path: app/js/map-manager.js
-      - path: app/js/ipc.js
-      - path: app/js/location-manager.js
+      - path: app/Core/RPC/RPCViewModel.swift
+        group: app/Core/RPC
+      - path: app/Core/RPC/Worker.swift
 
       - path: app/Manager/LocationManager.swift
         group: app/Manager
-      - path: app/Manager/SQLiteManager.swift
+      - path: app/Manager/PlaceManager.swift
+      - path: app/Manager/SafetyManager.swift
+      - path: app/Manager/BatteryManager.swift
+      - path: app/Manager/BackgroundTaskManager.swift
+      - path: app/Manager/AppEnvironment.swift
+      - path: app/Manager/StoreKitManager.swift
+      - path: app/Manager/DeepLinkHandler.swift
 
-      - path: app/Models/People.swift
+      - path: app/Models/Person.swift
         group: app/Models
+      - path: app/Models/Place.swift
+      - path: app/Models/LocationHistory.swift
 
-    # configs:
-    #   Release:
-    #     buildSettings:
-    #       DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"
+      - path: app/Database/Database.swift
+        group: app/Database
+      - path: app/Database/AppDatabase.swift
+
+      - path: app/js/app.js
+        group: app/js
+      - path: app/js/ipc.js
+      - path: app/js/constants.js
+      - path: app/js/hyperbee-manager.js
+      - path: app/js/identity-manager.js
+      - path: app/js/feed-manager.js
+      - path: app/js/hyperswarm-manager.js
+      - path: app/js/protocol-manager.js
+      - path: app/js/push.js
 
     scheme:
       preActions:
         - name: Link
           script: |
             PATH="${PATH}" "${PWD}/node_modules/.bin/bare-link" \
-              --preset ios\
+              --host ios-arm64 \
+              --host ios-arm64-simulator \
               --out ${PWD}/app/addons \
               ${PWD}
         - name: Pack
           script: |
             PATH="${PATH}" "${PWD}/node_modules/.bin/bare-pack" \
-              --preset ios\
+              --host ios-arm64 \
+              --host ios-arm64-simulator \
+              --linked \
               --base ${PWD} \
               --out ${PWD}/app/app.bundle \
               ${PWD}/app/js/app.js
-            PATH="${PATH}" "${PWD}/node_modules/.bin/bare-pack" \
-              --preset ios\
-              --base ${PWD} \
-              --out ${PWD}/app/push.bundle \
-              ${PWD}/app/js/push.js
-
-  NotificationServiceExtension:
-    type: app-extension
-    platform: iOS
-    deploymentTarget: 17.0
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.wherefam.ios.NotificationServiceExtension
-        SWIFT_VERSION: 5.0
-    info:
-      path: app/NotificationServiceExtension.Info.plist
-      properties:
-        CFBundleDisplayName: "WhereFam"
-        CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "1"
-
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.usernotifications.service
-          NSExtensionPrincipalClass: NotificationServiceExtension.NotificationService
-    entitlements:
-      path: app/NotificationServiceExtension.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.com.wherefam.ios
-        # com.apple.developer.usernotifications.filtering: true
-    dependencies:
-      - framework: app/frameworks/BareKit.xcframework
-      - package: BareKit
-    sources:
-      - path: app/NotificationService.swift
-      - path: app/js/push.js
-      - path: app/push.bundle
-        optional: true

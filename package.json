@@ -17,21 +17,25 @@
   },
   "homepage": "https://github.com/holepunchto/bare-ios#readme",
   "devDependencies": {
-    "bare-link": "^1.4.1",
-    "bare-pack": "^1.4.1",
-    "prettier": "^3.4.2",
+    "bare-link": "^3.1.0",
+    "bare-pack": "^2.0.1",
+    "prettier": "^3.8.1",
     "prettier-config-standard": "^7.0.0"
   },
   "dependencies": {
-    "b4a": "^1.6.7",
-    "compact-encoding": "^2.16.1",
-    "corestore": "^7.4.5",
-    "hyperbee": "^2.24.3",
-    "hypercore": "^11.11.1",
-    "hypercore-blob-server": "^1.11.0",
-    "hyperswarm": "^4.12.1",
+    "b4a": "^1.8.0",
+    "bare-events": "^2.8.2",
+    "blind-pairing": "^2.3.1",
+    "compact-encoding": "^2.19.2",
+    "corestore": "^7.9.2",
+    "hyperbee": "^2.27.3",
+    "hypercore": "^11.28.1",
+    "hypercore-blob-server": "^1.12.0",
+    "hypercore-crypto": "^3.6.1",
+    "hyperswarm": "^4.17.0",
+    "keet-identity-key": "^3.1.0",
     "protomux": "^3.10.1",
-    "sodium-native": "^5.0.6",
-    "udx-native": "^1.18.2"
+    "sodium-native": "^5.1.0",
+    "udx-native": "^1.19.2"
   }
 }
