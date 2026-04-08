@@ -7,9 +7,8 @@ struct CoordinatePickerView: View {
     @Binding var coordinate: CLLocationCoordinate2D?
     @Environment(\.dismiss) private var dismiss
 
-    @State private var pinCoord: CLLocationCoordinate2D = CLLocationCoordinate2D(
-        latitude: 37.3318, longitude: -122.0312
-    )
+    @State private var pinCoord: CLLocationCoordinate2D = LocationManager.shared.userLocation?.coordinate
+        ?? CLLocationCoordinate2D(latitude: 37.3318, longitude: -122.0312)
 
     var body: some View {
         NavigationStack {
@@ -55,12 +54,6 @@ struct CoordinatePickerView: View {
                     }
                     .fontWeight(.semibold)
                 }
-            }
-        }
-        .onAppear {
-            // Start at user location if available
-            if let loc = LocationManager.shared.userLocation {
-                pinCoord = loc.coordinate
             }
         }
     }

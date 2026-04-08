@@ -132,12 +132,14 @@ struct AddPlaceView: View {
     @State private var selectedPreset: Preset? = presets[0]
     @State private var customName    = ""
     @State private var isCustom      = false
-    @State private var useCurrentLoc = true
-    @State private var latString     = ""
-    @State private var lonString     = ""
-    @State private var radius        = 150.0
-    @State private var notifyArrive  = true
-    @State private var notifyLeave   = true
+    @State private var useCurrentLoc  = true
+    @State private var latString      = ""
+    @State private var lonString      = ""
+    @State private var pinnedCoord:   CLLocationCoordinate2D?
+    @State private var showPinPicker  = false
+    @State private var radius         = 150.0
+    @State private var notifyArrive   = true
+    @State private var notifyLeave    = true
     @State private var coordError: String?
 
     private var placeName: String {
@@ -148,6 +150,7 @@ struct AddPlaceView: View {
     }
     private var coordinate: CLLocationCoordinate2D? {
         if useCurrentLoc { return LocationManager.shared.userLocation?.coordinate }
+        if let p = pinnedCoord { return p }
         guard let lat = Double(latString), let lon = Double(lonString),
               lat >= -90, lat <= 90, lon >= -180, lon <= 180 else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
@@ -215,8 +218,33 @@ struct AddPlaceView: View {
                 // MARK: Location
                 Section {
                     Toggle("Use my current location", isOn: $useCurrentLoc)
+                        .onChange(of: useCurrentLoc) { _, on in
+                            if on { pinnedCoord = nil; latString = ""; lonString = "" }
+                        }
 
                     if !useCurrentLoc {
+                        // Drop pin on map
+                        Button {
+                            showPinPicker = true
+                        } label: {
+                            HStack {
+                                Label("Drop pin on map", systemImage: "mappin.and.ellipse")
+                                Spacer()
+                                if let p = pinnedCoord {
+                                    Text(String(format: "%.4f, %.4f", p.latitude, p.longitude))
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption).foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                        .sheet(isPresented: $showPinPicker) {
+                            CoordinatePickerView(coordinate: $pinnedCoord)
+                        }
+
+                        // Or enter manually
                         HStack {
                             Text("Latitude")
                             Spacer()
@@ -224,6 +252,7 @@ struct AddPlaceView: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 140)
+                                .onChange(of: latString) { _, _ in pinnedCoord = nil }
                         }
                         HStack {
                             Text("Longitude")
@@ -232,6 +261,7 @@ struct AddPlaceView: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 140)
+                                .onChange(of: lonString) { _, _ in pinnedCoord = nil }
                         }
                         if let err = coordError {
                             Text(err).font(.caption).foregroundStyle(.red)
@@ -254,7 +284,7 @@ struct AddPlaceView: View {
                     Text("Where is it?")
                 } footer: {
                     if !useCurrentLoc {
-                        Text("Long-press any location in Maps to copy its coordinates.")
+                        Text("Drop a pin on the map or enter coordinates manually.")
                     }
                 }
 
