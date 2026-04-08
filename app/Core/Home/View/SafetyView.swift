@@ -11,7 +11,7 @@ struct SafetyView: View {
             } header: {
                 Text("Emergency")
             } footer: {
-                Text("Sends your live location to every person in your WhereFam circle over an encrypted peer-to-peer connection. No server is involved.")
+                Text("Sends your live location to every person in your WhereFam circle over an encrypted peer-to-peer connection.")
             }
 
             Section("Crash detection") {
