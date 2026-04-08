@@ -29,6 +29,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "WhereFam"
         INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.social-networking"
         SWIFT_VERSION: 5.0
+        ASSETCATALOG_COMPILER_APPICON_NAME: "WhereFam"
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         DEVELOPMENT_TEAM: 2VA8UMF2PR
         CODE_SIGN_STYLE: Manual
@@ -82,7 +83,6 @@ targets:
             - fetch
             - processing
 
-    appIcon: app/WhereFam.icon
 
     dependencies:
       - package: ConcentricOnboarding
@@ -96,9 +96,9 @@ targets:
     sources:
       - path: app/app.bundle
         optional: true
-      - path: app/Assets.xcassets
       - path: app/NotificationService.swift
       - path: app/LaunchScreen.storyboard
+      - path: app/WhereFam.icon
 
       - path: app/Application/App.swift
         group: app/Application
