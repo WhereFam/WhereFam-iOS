@@ -1,260 +1,117 @@
-//
-//  HomeView.swift
-//  App
-//
-//  Created by joker on 2025-01-13.
-//
-
+// app/Core/Home/View/HomeView.swift
 import SwiftUI
-import MapLibre
-import CoreLocation
-import RevenueCat
-import RevenueCatUI
 
 struct HomeView: View {
-    @EnvironmentObject var ipcViewModel: IPCViewModel
-    
-    @State private var isPressed = false
-    @State private var isSheetPresented: Bool = false
-    @State private var selectedOption: MenuOption? = nil
-    
-    @State private var timer: Timer? = nil
-    @State private var showMap: Bool = false
-    @State private var isSubscribed: Bool = false
-    
+    @EnvironmentObject var rpc:         RPCViewModel
+    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var safety:      SafetyManager
+
+    @State private var selectedTab: Tab = .map
+
+    enum Tab { case map, people, places, safety }
+
     var body: some View {
-        ZStack {
-            SimpleMapView()
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    MenuButton(
-                        isPressed: $isPressed,
-                        selectedOption: $selectedOption,
-                        isSheetPresented: $isSheetPresented,
-                        isSubscribed: $isSubscribed
-                    )
-                }
-            }
-        }
-        .onAppear {
-            onAppear()
-            LocationManager.shared.requestLocation()
-        }
-        .onDisappear(perform: stopLocationUpdateTimer)
-        .sheet(item: $selectedOption) { option in
-            sheetView(for: option)
-        }
-        .ignoresSafeArea(.all)
-    }
-    
-    //TODO: Change the name or improve the code
-    private func onAppear() {
-        Task {
-            await startHyperswarm()
-            startLocationUpdateTimer()
-            
-            try await Task.sleep(for: .seconds(5))
-            getPublicKey()
-            joinPeersFromDatabase()
+        TabView(selection: $selectedTab) {
+            NavigationStack { mapTab }
+                .tabItem { Label("Map",    systemImage: "map.fill") }
+                .tag(Tab.map)
+
+            NavigationStack { PeopleView() }
+                .tabItem { Label("People", systemImage: "person.2.fill") }
+                .tag(Tab.people)
+
+            NavigationStack { PlacesView() }
+                .tabItem { Label("Places", systemImage: "mappin.and.ellipse") }
+                .tag(Tab.places)
+
+            NavigationStack { SafetyView() }
+                .tabItem { Label("Safety", systemImage: "shield.fill") }
+                .tag(Tab.safety)
+                .badge(safety.sosState != .idle ? "!" : nil)
         }
     }
-    
-    private func startHyperswarm() async {
-        let directory = URL.documentsDirectory
-        let message: [String: Any] = [
-            "action": "start",
-            "data": [
-                "path" : directory.path()
-            ]
-        ]
-        await ipcViewModel.writeToIPC(message: message)
-    }
-    
-    private func getPublicKey() {
-        Task {
-            if ipcViewModel.publicKey.isEmpty {
-                let message: [String: Any] = [
-                    "action": "requestPublicKey",
-                    "data": [:]
-                ]
-                await ipcViewModel.writeToIPC(message: message)
-            }
-        }
-    }
-    
-    // TODO: Use AsynSequence rather than this timer lol!!
-    private func startLocationUpdateTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
-            sendUserLocation()
-        }
-    }
-    
-    private func stopLocationUpdateTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
-    private func joinPeersFromDatabase() {
-        ipcViewModel.refreshPeople()
-        let savedPeople = SQLiteManager.shared.fetchAllPeople()
-        
-        if !savedPeople.isEmpty {
-            Task {
-                for member in savedPeople {
-                    let message: [String: Any] = [
-                        "action": "joinPeer",
-                        "data": member.id
-                    ]
-                    
-                    await ipcViewModel.writeToIPC(message: message)
-                }
-            }
-        }
-    }
-    
-    private func sendUserLocation() {
-        Task {
-            if let location = LocationManager.shared.userLocation {
-                let message: [String: Any] = [
-                    "action": "locationUpdate",
-                    "data": [
-                        "id": ipcViewModel.publicKey,
-                        "name": UserDefaults.standard.string(forKey: "userName") ?? "nil",
-                        "latitude": location.coordinate.latitude,
-                        "longitude": location.coordinate.longitude
-                    ]
-                ]
-                await ipcViewModel.writeToIPC(message: message)
-            }
-        }
-    }
-    
+
     @ViewBuilder
-    private func sheetView(for option: MenuOption) -> some View {
-        switch option {
-        case .people:
-            PeopleView()
-        case .shareID:
-            ShareIDView()
-            // case .provideFeedback:
-            //     return AnyView(ProvideFeedbackView())
-        case .support:
-            if isSubscribed {
-                ThanksView()
-            } else {
-                PaywallView()
+    private var mapTab: some View {
+        ZStack(alignment: .bottomTrailing) {
+            SimpleMapView().ignoresSafeArea()
+            VStack(spacing: 10) {
+                SOSButton()
+                MapMenuFAB()
             }
-        case .about:
-            AboutView()
+            .padding()
         }
+        .navigationBarHidden(true)
     }
 }
 
-struct MenuButton: View {
-    @Binding var isPressed: Bool
-    @Binding var selectedOption: MenuOption?
-    @Binding var isSheetPresented: Bool
-    @Binding var isSubscribed: Bool
-    
+// MARK: - Map FAB menu
+
+struct MapMenuFAB: View {
+    @EnvironmentObject var rpc: RPCViewModel
+    @State private var selected: MenuOpt?
+
+    enum MenuOpt: String, Identifiable {
+        case shareID, support, identity, about
+        var id: String { rawValue }
+    }
+
     var body: some View {
         Menu {
-            Button(action: { openSheet(.people) }) {
-                Label("People", systemImage: "person.circle")
+            Button { selected = .shareID }  label: { Label("Share Your ID",  systemImage: "qrcode") }
+            Button { selected = .support }  label: { Label("Support App",    systemImage: "wand.and.stars") }
+            Button { selected = .identity } label: { Label("Your Identity",  systemImage: "key.fill") }
+            ShareLink(item: URL(string: "https://wherefam.com")!) { Label("Refer a Friend", systemImage: "square.and.arrow.up") }
+            if let url = URL(string: "https://apps.apple.com/app/id6749550634?action=write-review") {
+                Link(destination: url) { Label("Rate App", systemImage: "star") }
             }
-            
-            Button(action: { openSheet(.shareID) }) {
-                Label("Share Your ID", systemImage: "qrcode")
-            }
-            
-            // Button(action: { openSheet(.provideFeedback) }) {
-            //     Label("Provide Feedback", systemImage: "exclamationmark.bubble")
-            // }
-            
-            Button(action: { openSupportSheet() }) {
-                Label("Support App", systemImage: "wand.and.stars")
-            }
-            
-            ShareLink(item: "https://wherefam.com") {
-                Label("Refer To Friend", systemImage: "square.and.arrow.up")
-            }
-            
-            if let reviewURL = URL(string: "https://apps.apple.com/app/id6749550634?action=write-review") {
-                Link(destination: reviewURL) {
-                    Label("Rate App", systemImage: "link")
-                }
-            }
-            
-            Button(action: { openSheet(.about) }) {
-                Label("About", systemImage: "info.circle")
-            }
-            
+            Button { selected = .about } label: { Label("About", systemImage: "info.circle") }
         } label: {
             Image(systemName: "plus.circle.fill")
-                .font(.system(size: 33))
-                .foregroundColor(.blue)
-                .padding()
-                .background(Circle().fill(Color(UIColor.systemBackground)).shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5))
-                .scaleEffect(isPressed ? 0.95 : 1.0)
-                .animation(.spring(), value: isPressed)
+                .font(.system(size: 33)).foregroundStyle(.blue)
+                .background(Circle().fill(.background).shadow(radius: 6))
         }
-        .padding()
-    }
-    
-    private func openSheet(_ option: MenuOption) {
-        selectedOption = option
-        isSheetPresented.toggle()
-    }
-    
-    // Handle Support sheet opening and subscription check
-        private func openSupportSheet() {
-            checkSubscriptionStatus { isActive in
-                self.isSubscribed = isActive
-                // Show the support sheet once subscription check is done
-                selectedOption = .support
-                isSheetPresented = true
+        .sheet(item: $selected) { opt in
+            switch opt {
+            case .shareID:  ShareIDView()
+            case .support:  StoreKitPaywallView()
+            case .identity: IdentityView()
+            case .about:    AboutView()
             }
-        }
-        
-        // Perform the subscription status check
-        private func checkSubscriptionStatus(completion: @escaping (Bool) -> Void) {
-            Purchases.shared.getCustomerInfo { (customerInfo, error) in
-                if let error = error {
-                    print("Error fetching customer info: \(error.localizedDescription)")
-                    completion(false)  // If error, assume not subscribed
-                    return
-                }
-                
-                if let customerInfo = customerInfo {
-                    let isActive = customerInfo.entitlements["Tip"]?.isActive == true
-                    completion(isActive)  // Return subscription status via completion handler
-                } else {
-                    completion(false)  // No customer info, assume not subscribed
-                }
-            }
-        }
-}
-
-enum MenuOption: Identifiable {
-    case people, shareID, support, about
-    
-    var id: String {
-        switch self {
-        case .people:
-            return "people"
-        case .shareID:
-            return "shareID"
-        case .about:
-            return "about"
-        case .support:
-            return "support"
         }
     }
 }
 
-#Preview {
-    
-    HomeView()
-        .environmentObject(IPCViewModel())
+// MARK: - SOS floating button
+
+struct SOSButton: View {
+    @EnvironmentObject var safety: SafetyManager
+    var body: some View {
+        Button {
+            if case .idle     = safety.sosState { safety.triggerManualSOS() }
+            else if case .countdown = safety.sosState { safety.cancelSOS() }
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(bg).clipShape(Capsule())
+                .shadow(color: .black.opacity(0.15), radius: 6)
+        }
+    }
+
+    private var label: String {
+        switch safety.sosState {
+        case .idle:              return "SOS"
+        case .countdown(let s): return "Cancel \(s)s"
+        case .active:           return "SOS sent"
+        case .cancelled:        return "SOS"
+        }
+    }
+    private var bg: Color {
+        switch safety.sosState {
+        case .idle, .cancelled: return .red
+        case .countdown:        return .orange
+        case .active:           return .green
+        }
+    }
 }

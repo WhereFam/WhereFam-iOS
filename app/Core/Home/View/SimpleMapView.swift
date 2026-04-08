@@ -1,149 +1,129 @@
-//
-//  SimpleMapView.swift
-//  WhereFam
-//
-//  Created by joker on 2025-08-08.
-//
-
+// app/Core/Home/View/SimpleMapView.swift
 import MapLibre
 import SwiftUI
+import CoreLocation
+import SQLiteData
 
 struct SimpleMapView: UIViewRepresentable {
-    @EnvironmentObject var ipcViewModel: IPCViewModel
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
+    @FetchAll(Person.all) var people
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> MLNMapView {
-//        guard let styleURL = Bundle.main.url(forResource: "style", withExtension: "json") else {
-//            fatalError("Failed to find style.json in the app bundle.")
-//        }
-        
-        let styleURL = URL(string: "https://tiles.openfreemap.org/styles/liberty")
-        
-        let mapView = MLNMapView(frame: .zero, styleURL: styleURL)
-        mapView.delegate = context.coordinator
-        mapView.showsUserLocation = true
-        
-        return mapView
+        let map = MLNMapView(
+            frame: .zero,
+            styleURL: URL(string: "https://tiles.openfreemap.org/styles/liberty")
+        )
+        map.delegate = context.coordinator
+        map.showsUserLocation = true
+        map.compassViewPosition = .topLeft
+        return map
     }
-    
-    func updateUIView(_ uiView: MLNMapView, context: Context) {
-       updateAnnotations(for: uiView)
-    }
-    
-    private func updateAnnotations(for mapView: MLNMapView) {
-        var newAnnotations = [MLNAnnotation]()
-        for person in ipcViewModel.people {
-            if let lat = person.latitude, let lon = person.longitude {
-                let annotation = PersonAnnotation()
-                annotation.coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                annotation.title = person.name
-                annotation.name = person.name
-                annotation.annotationID = person.id
-                
-                annotation.image = UIImage(systemName: "person.circle.fill")
-                newAnnotations.append(annotation)
-            }
-        }
-        
-        if let existingAnnotations = mapView.annotations {
-            mapView.removeAnnotations(existingAnnotations)
-        }
-        
-        mapView.addAnnotations(newAnnotations)
-    }
-    
-    class Coordinator: NSObject, MLNMapViewDelegate {
-        var parent: SimpleMapView
-        var hasCenteredOnce = false
-        
-        init(_ parent: SimpleMapView) {
-            self.parent = parent
-        }
-        
-        func mapView(_ mapView: MLNMapView, didUpdate userLocation: MLNUserLocation?) {
-            if !hasCenteredOnce, let location = userLocation?.location {
-                mapView.setCenter(location.coordinate, zoomLevel: 14.0, animated: true)
-                hasCenteredOnce = true
-            }
-        }
-        
-        func mapView(_ mapView: MLNMapView, didChange mode: MLNUserTrackingMode, animated: Bool) {
-            if mode != .follow {
-                mapView.userTrackingMode = .none
-            }
-        }
-        
-        func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
-            guard let annotation = annotation as? PersonAnnotation, let id = annotation.annotationID else {
-                return nil
-            }
 
-            if let existingView = mapView.dequeueReusableAnnotationView(withIdentifier: id) {
-                if let hostingController = existingView.subviews.first as? UIHostingController<AnnotationView> {
-                    hostingController.rootView = AnnotationView(name: annotation.name, image: annotation.image)
+    func updateUIView(_ map: MLNMapView, context: Context) {
+        context.coordinator.sync(people, on: map)
+    }
+
+    final class Coordinator: NSObject, MLNMapViewDelegate {
+        private var centred = false
+
+        func sync(_ people: [Person], on map: MLNMapView) {
+            let live    = people.filter { $0.latitude != nil && $0.longitude != nil }
+            let liveIDs = Set(live.map(\.id))
+            let existing = (map.annotations ?? []).compactMap { $0 as? PersonPin }
+
+            map.removeAnnotations(existing.filter { !liveIDs.contains($0.personID) })
+
+            let byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.personID, $0) })
+            for p in live {
+                guard let lat = p.latitude, let lon = p.longitude else { continue }
+                let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                if let pin = byID[p.id] { pin.coordinate = coord; pin.person = p }
+                else {
+                    let pin = PersonPin()
+                    pin.personID = p.id
+                    pin.coordinate = coord
+                    pin.person = p
+                    map.addAnnotation(pin)
                 }
-                return existingView
             }
+        }
 
-            let hostingController = UIHostingController(
-                rootView: AnnotationView(name: annotation.name, image: annotation.image)
-            )
+        func mapView(_ map: MLNMapView, didUpdate loc: MLNUserLocation?) {
+            guard !centred, let l = loc?.location else { return }
+            map.setCenter(l.coordinate, zoomLevel: 14, animated: true)
+            centred = true
+        }
 
-            let size = hostingController.view.intrinsicContentSize
-
-            let annotationView = MLNAnnotationView(reuseIdentifier: id)
-            annotationView.frame = CGRect(origin: .zero, size: size)
-
-            hostingController.view.frame = annotationView.bounds
-            hostingController.view.backgroundColor = .clear
-
-            annotationView.addSubview(hostingController.view)
-
-            annotationView.centerOffset = CGVector(dx: 0, dy: -size.height / 2)
-
-            return annotationView
+        func mapView(_ map: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
+            guard let pin = annotation as? PersonPin, let person = pin.person else { return nil }
+            let reuseID = "pin-\(person.id)"
+            if let v = map.dequeueReusableAnnotationView(withIdentifier: reuseID) as? PersonPinView {
+                v.update(person); return v
+            }
+            let v = PersonPinView(reuseIdentifier: reuseID)
+            v.update(person)
+            v.centerOffset = CGVector(dx: 0, dy: -30)
+            return v
         }
     }
 }
 
-struct AnnotationView: View {
-    let name: String?
-    let image: UIImage?
+// MARK: - Annotation model + view
 
+final class PersonPin: MLNPointAnnotation {
+    var personID: String = ""
+    var person: Person?
+}
+
+final class PersonPinView: MLNAnnotationView {
+    private var host: UIHostingController<PinSwiftUI>!
+    override init(reuseIdentifier: String?) {
+        super.init(reuseIdentifier: reuseIdentifier)
+        host = UIHostingController(rootView: PinSwiftUI(person: nil))
+        host.view.backgroundColor = .clear
+        addSubview(host.view)
+        frame = CGRect(origin: .zero, size: CGSize(width: 60, height: 68))
+        host.view.frame = bounds
+    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    func update(_ person: Person) { host.rootView = PinSwiftUI(person: person) }
+}
+
+struct PinSwiftUI: View {
+    let person: Person?
     var body: some View {
-        VStack(spacing: 4) {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                    .foregroundColor(.blue)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            } else {
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-                    .foregroundColor(.gray)
+        VStack(spacing: 2) {
+            ZStack {
+                Circle().fill(.white).frame(width: 48, height: 48)
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                avatarView.frame(width: 44, height: 44).clipShape(Circle())
+                if person?.isOnline == true {
+                    Circle().fill(.green).frame(width: 11, height: 11)
+                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                        .offset(x: 15, y: -15)
+                }
+                if person?.isDriving == true {
+                    Image(systemName: "car.fill").font(.system(size: 9)).foregroundStyle(.white)
+                        .padding(3).background(.orange).clipShape(Capsule())
+                        .offset(x: -15, y: -15)
+                }
             }
-            if let name = name {
-                Text(name)
-                    .font(.caption)
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 4)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(5)
+            if let name = person?.name {
+                Text(name).font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(.thinMaterial).clipShape(Capsule())
             }
         }
     }
-}
 
-class PersonAnnotation: MLNPointAnnotation {
-    var name: String?
-    var image: UIImage?
-    var annotationID: String?
+    @ViewBuilder private var avatarView: some View {
+        if let data = person?.avatarData, let img = UIImage(data: data) {
+            Image(uiImage: img).resizable().scaledToFill()
+        } else {
+            Circle().fill(Color.blue.opacity(0.12))
+                .overlay(Text(person?.initials ?? "?")
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(.blue))
+        }
+    }
 }

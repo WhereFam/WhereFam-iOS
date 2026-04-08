@@ -1,42 +1,18 @@
-//
-//  ThirdPageView.swift
-//  App
-//
-//  Created by joker on 2025-01-12.
-//
-
+// app/Core/Onboarding/View/SecondPageView.swift
 import SwiftUI
 
 struct SecondPageView: View {
-    @AppStorage("userName") var userName: String = ""
-    
+    @AppStorage("userName") var userName = ""
     var body: some View {
-        
-        VStack {
+        VStack(spacing: 20) {
+            Spacer()
             Text("What's your name?")
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding()
-            
-            
-            TextField("Enter your name", text: $userName)
+                .font(.title.weight(.bold)).foregroundStyle(.white)
+            TextField("Your name", text: $userName)
+                .padding().frame(height: 50)
+                .background(.white).clipShape(RoundedRectangle(cornerRadius: 25))
                 .padding(.horizontal)
-                .frame(height: 50)
-                .background(Color(.systemBackground))
-                .foregroundColor(.primary)
-                .cornerRadius(25)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 25)
-                        .stroke(.white, lineWidth: 2)
-                )
-                .padding(.horizontal)
-            
-        }
-        .padding()
+            Spacer()
+        }.padding()
     }
-}
-
-#Preview {
-    SecondPageView()
 }

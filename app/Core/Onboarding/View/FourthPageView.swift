@@ -1,56 +1,27 @@
-//
-//  FourthPageView.swift
-//  App
-//
-//  Created by joker on 2025-01-12.
-//
-
+// app/Core/Onboarding/View/FourthPageView.swift
 import SwiftUI
 
 struct FourthPageView: View {
     var body: some View {
-        VStack {
+        VStack(spacing: 24) {
             Spacer()
-            Image(systemName: "paperplane.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 200, height: 200)
-                .foregroundColor(.white)
-                .padding(.bottom, 32)
-            
-            
-            Text("Would you like to find family and friends nearby?")
-                .font(.system(size: 28, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .foregroundColor(.white)
-                .padding()
-            
-            Text("Start sharing your location now")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.white)
-                .frame(width: 140)
-                .padding()
-            
-            
-            
-            Button(action: {
-                LocationManager.shared.requestLocation()
-            }) {
-                Text("Continue")
-                    .font(.title2)
-                    .padding()
+            Image(systemName: "location.circle.fill")
+                .resizable().scaledToFit().frame(width: 100, height: 100).foregroundStyle(.white)
+            Text("Share your location")
+                .font(.title.weight(.bold)).foregroundStyle(.white)
+            Text("Your location is shared only with people you trust, directly over an encrypted peer-to-peer connection. No server ever sees it.")
+                .font(.body).foregroundStyle(.white.opacity(0.85)).multilineTextAlignment(.center)
+            Button {
+                LocationManager.shared.requestPermission()
+            } label: {
+                Text("Allow Location Access")
+                    .font(.headline).padding()
                     .frame(maxWidth: .infinity)
                     .background(.white)
-                    .foregroundColor(Color(UIColor(#colorLiteral(red: 1, green: 0.7349339692, blue: 0.5137254902, alpha: 1))))
-                    .cornerRadius(10)
-            }
-            .padding()
-            
+                    .foregroundStyle(Color(red: 1, green: 0.73, blue: 0.51))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }.padding(.horizontal)
             Spacer()
-        }
+        }.padding()
     }
-}
-
-#Preview {
-    FourthPageView()
 }

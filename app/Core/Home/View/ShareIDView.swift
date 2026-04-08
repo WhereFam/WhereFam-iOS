@@ -1,137 +1,114 @@
-//
-//  ShareIDView.swift
-//  App
-//
-//  Created by joker on 2025-01-16.
-//
-
+// app/Core/Home/View/ShareIDView.swift
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 
-extension View {
-    @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
-}
-
 struct ShareIDView: View {
-    @EnvironmentObject var ipcViewModel: IPCViewModel
-    @State private var qrCodeImage: UIImage?
-    
+    @EnvironmentObject var rpc: RPCViewModel
+    @State private var qrImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                qrCodeSection
-                copyPublicKeySection
-                
+            VStack(spacing: 24) {
+                Spacer()
+
+                Group {
+                    if let qr = qrImage {
+                        Image(uiImage: qr)
+                            .interpolation(.none)
+                            .resizable().scaledToFit()
+                            .frame(width: 200, height: 200)
+                            .padding(16)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.systemFill))
+                            .frame(width: 200, height: 200)
+                            .overlay(
+                                rpc.publicKey.isEmpty
+                                    ? AnyView(ProgressView())
+                                    : AnyView(EmptyView())
+                            )
+                    }
+                }
+
+                HStack {
+                    Rectangle().fill(Color(.separator)).frame(height: 0.5)
+                    Text("or copy ID").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 8)
+                    Rectangle().fill(Color(.separator)).frame(height: 0.5)
+                }.padding(.horizontal, 32)
+
+                if !rpc.publicKey.isEmpty {
+                    HStack(spacing: 8) {
+                        Text(rpc.publicKey)
+                            .font(.caption.monospaced())
+                            .lineLimit(1).truncationMode(.middle)
+                            .padding(10)
+                            .background(Color(.secondarySystemFill))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Button {
+                            UIPasteboard.general.string = rpc.publicKey
+                        } label: {
+                            Image(systemName: "doc.on.clipboard")
+                                .foregroundStyle(.blue)
+                                .padding(10)
+                                .background(Color(.secondarySystemFill))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Copy ID")
+                    }
+                    .padding(.horizontal, 24)
+                } else {
+                    Text("Connecting…")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                Spacer()
             }
-            .navigationTitle("Share Your ID")
+            .navigationTitle("Your ID")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                toolbarContent
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if let qr = qrImage {
+                        let img = Image(uiImage: qr)
+                        ShareLink(item: img, preview: SharePreview("My WhereFam ID", image: img)) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                }
             }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
-            generateQRCode(from: ipcViewModel.publicKey)
-        }
-        .onChange(of: ipcViewModel.publicKey) { oldValue, newValue in
-            generateQRCode(from: oldValue.isEmpty ? newValue : oldValue)
-        }
-        .if(UIDevice.current.userInterfaceIdiom == .phone) { view in
-            view.presentationDetents([.medium])
-        }
-        .presentationDragIndicator(.visible)
-    }
-    
-    private func generateQRCode(from string: String) {
-        let context = CIContext()
-        let filter = CIFilter.qrCodeGenerator()
-        let data = string.data(using: .utf8)
-        
-        filter.setValue(data, forKey: "inputMessage")
-        
-        if let outputImage = filter.outputImage {
-            let cgImage = context.createCGImage(outputImage, from: outputImage.extent)
-            qrCodeImage = UIImage(cgImage: cgImage!)
-        }
-    }
-    
-    private var qrCodeSection: some View {
-        Group {
-            if let qrImage = qrCodeImage {
-                VStack {
-                    Image(uiImage: qrImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 200, height: 200)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
-                        .shadow(radius: 5)
-                }
+            // If we already have the key just generate the QR
+            if !rpc.publicKey.isEmpty {
+                generateQR()
+            } else {
+                // Request it from the JS side — response comes via publicKeyResponse
+                Task { await rpc.send(.requestPublicKey) }
             }
         }
+        .onChange(of: rpc.publicKey) { _, _ in generateQR() }
     }
-    
-    private var copyPublicKeySection: some View {
-        Group {
-            Text("Or copy public ID")
-                .foregroundStyle(.secondary)
-            
-            if !ipcViewModel.publicKey.isEmpty {
-                HStack {
-                    Text(ipcViewModel.publicKey)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .padding(10)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                        .lineLimit(1)
-                    
-                    copyButton
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
-    
-    private var copyButton: some View {
-        Button(action: {
-            UIPasteboard.general.string = ipcViewModel.publicKey
-        }) {
-            Image(systemName: "doc.on.clipboard")
-                .foregroundColor(.blue)
-                .padding(10)
-                .background(.gray.opacity(0.1))
-                .clipShape(Circle())
-        }
-        .accessibilityLabel("Copy Public Key")
-    }
-    
-    private var toolbarContent: some View {
-        Group {
-            if let image = qrCodeImage {
-                let shareImage = Image(uiImage: image)
-                ShareLink(item: shareImage, preview: SharePreview("Share ID to Friends", image: shareImage)) {
-                    Label("Share QR Code", systemImage: "square.and.arrow.up")
-                        .font(.headline)
-                        .padding()
-                        .foregroundColor(.blue)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(8)
-                }
-            }
-        }
-    }
-}
 
-#Preview {
-    ShareIDView()
-        .environmentObject(IPCViewModel())
+    private func generateQR() {
+        guard !rpc.publicKey.isEmpty else { return }
+        let b64url = rpc.publicKey
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        guard let data = "wherefam://add?id=\(b64url)".data(using: .utf8) else { return }
+        let filter = CIFilter.qrCodeGenerator()
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M",  forKey: "inputCorrectionLevel")
+        guard let out = filter.outputImage else { return }
+        let scaled = out.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        guard let cg = CIContext().createCGImage(scaled, from: scaled.extent) else { return }
+        qrImage = UIImage(cgImage: cg)
+    }
 }

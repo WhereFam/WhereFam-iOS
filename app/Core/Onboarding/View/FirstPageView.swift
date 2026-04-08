@@ -1,10 +1,4 @@
-//
-//  FirstPageView.swift
-//  App
-//
-//  Created by joker on 2025-01-11.
-//
-
+// app/Core/Onboarding/View/FirstPageView.swift
 import SwiftUI
 
 struct FirstPageView: View {
@@ -44,8 +38,4 @@ struct FirstPageView: View {
         .padding()
         
     }
-}
-
-#Preview {
-    FirstPageView()
 }
