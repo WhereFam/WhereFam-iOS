@@ -66,8 +66,8 @@ struct MapMenuFAB: View {
             }
             Button { selected = .about } label: { Label("About", systemImage: "info.circle") }
         } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 33)).foregroundStyle(.blue)
+            Image(systemName: "line.3.horizontal.circle.fill")
+                .font(.system(size: 44)).foregroundStyle(.blue)
                 .background(Circle().fill(.background).shadow(radius: 6))
         }
         .sheet(item: $selected) { opt in
