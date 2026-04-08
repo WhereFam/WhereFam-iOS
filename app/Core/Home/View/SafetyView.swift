@@ -35,14 +35,6 @@ struct SafetyView: View {
                     }
                 }
             }
-
-            Section("Privacy") {
-                Label("All data stays on your device", systemImage: "lock.shield")
-                Label("Shared only with trusted peers", systemImage: "person.2.fill")
-                Label("No server ever receives your location", systemImage: "xmark.icloud")
-            }
-            .foregroundStyle(.secondary)
-            .font(.subheadline)
         }
         .navigationTitle("Safety")
         .navigationBarTitleDisplayMode(.large)
