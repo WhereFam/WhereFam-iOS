@@ -44,6 +44,7 @@ targets:
         NSLocationWhenInUseUsageDescription: "WhereFam shares your location only with people you trust, directly over an encrypted peer-to-peer connection."
         NSLocationAlwaysAndWhenInUseUsageDescription: "WhereFam needs background location to keep your circle updated even when the app is closed. Your location is never sent to any server."
         NSLocationAlwaysUsageDescription: "WhereFam needs background location to keep your circle updated even when the app is closed."
+        NSCameraUsageDescription: "WhereFam uses the camera to scan family member invite codes."
         UILaunchStoryboardName: "LaunchScreen.storyboard"
         UIBackgroundModes:
           - location
