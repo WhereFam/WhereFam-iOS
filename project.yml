@@ -24,6 +24,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.wherefam.ios
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_CFBundleDisplayName: "WhereFam"
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.social-networking"
         SWIFT_VERSION: 5.0
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         DEVELOPMENT_TEAM: 2VA8UMF2PR
@@ -57,11 +61,11 @@ targets:
           NSAllowsArbitraryLoads: true
         UIRequiresFullScreen: true
         CFBundleURLTypes:
-          - CFBundleURLSchemes:
+          - CFBundleURLName: com.wherefam.ios
+            CFBundleURLSchemes:
               - wherefam
-        CFBundleURLName: com.wherefam.ios
-        CFBundleDisplayName: "WhereFam"
-        CFBundleShortVersionString: "2.0.0"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
 
     entitlements:
       path: app/WhereFam.entitlements
