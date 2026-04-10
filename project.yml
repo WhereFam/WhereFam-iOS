@@ -23,6 +23,7 @@ targets:
     deploymentTarget: 17.0
     settings:
       base:
+        PRODUCT_NAME: WhereFam
         PRODUCT_BUNDLE_IDENTIFIER: com.wherefam.ios
         MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: "1"
